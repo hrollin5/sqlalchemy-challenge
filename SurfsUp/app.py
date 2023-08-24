@@ -148,8 +148,10 @@ def tobs():
     return jsonify(tobs_list)
 
 
-
+# Create start end route
 @app.route('/api/v1.0/<start>/<end>')
+
+# Define stats function for start and end dates
 def stats(start=None, end=None):
     # Create our session from Python to the DB
     Session = sessionmaker(bind=engine)
@@ -158,7 +160,7 @@ def stats(start=None, end=None):
     """Return Daily Temperature Minimum, Maximum, and Average for all dates after {start}."""
     sel = [measurement.date, func.avg(measurement.tobs), func.max(measurement.tobs),\
             func.min(measurement.tobs)]
-    # Perform query
+    # Perform query with no end date
     if not end: 
         # Convert start date to datetime
         start = dt.datetime.strptime(start, "%Y-%m-%d")
@@ -180,13 +182,13 @@ def stats(start=None, end=None):
 
         # Return the JSON representation of the list
         return jsonify(from_start)
-
+    
     """Daily Temperature Minimum, Maximum, and Average for dates between {start} and {end}"""
     # Convert dates to datetime
     start = dt.datetime.strptime(start, "%Y-%m-%d")
     end = dt.datetime.strptime(end, "%Y-%m-%d")
 
-    # Perform query
+    # Perform query with end date
     results = session.query(*sel).filter(measurement.date >= start).filter(measurement.date <= end).\
         group_by(measurement.date).all()
 
