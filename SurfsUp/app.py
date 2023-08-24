@@ -108,7 +108,22 @@ def tobs():
     session = Session()
 
     """Return a list of tobs."""
+    # Find correct query date:
+        # Get most recent date
+    most_recent_date = session.query(func.max(measurement.date)).scalar()
+        # Convert to datetime
+    most_recent_datetime = dt.datetime.strptime(most_recent_date,"%Y-%m-%d").date()
+        # Find date 1 year ago from most recent date
+    query_date = most_recent_datetime - dt.timedelta(days=365)
 
+    # Find most active station
+    descending_stations = session.query(measurement.station, func.count(measurement.id)).group_by(measurement.station).order_by(func.count(measurement.id).desc()).all()
+    most_active_station = descending_stations[0][0]
+
+    # Using the most active station and query date, perform a query to retrieve the tobs for that station f
+    station_recent = session.query(measurement.tobs, measurement.date).\
+    filter(measurement.station == most_active_station).\
+    filter(measurement.date >= query_date)
     session.close()
 
     # Convert into dictionary
