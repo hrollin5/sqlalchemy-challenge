@@ -57,6 +57,10 @@ def welcome():
         "<br/>Daily Temperature Info for Custom Date Range:<br/>"
         "/api/v1.0/<start><br/>"
         "*Enter a desired start date in YYYY-MM-DD format or "
+        "enter start and end dates in YYYY-MM-DD/YYYY-MM-DD format*<br/>"
+        "<br/>Aggregated Temperature in Custom Date Range:<br/>"
+        "/api/v1/0/aggregate/<start><br/>"
+        "*Enter a desired start date in YYYY-MM-DD format or "
         "enter start and end dates in YYYY-MM-DD/YYYY-MM-DD format*"
     )
 
@@ -149,10 +153,11 @@ def tobs():
 
 
 # Create start end route
+@app.route('/api/v1.0/<start>/')
 @app.route('/api/v1.0/<start>/<end>')
 
 # Define stats function for start and end dates
-def stats(start=None, end=None):
+def stats(start, end=None):
     # Create our session from Python to the DB
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -160,8 +165,10 @@ def stats(start=None, end=None):
     """Return Daily Temperature Minimum, Maximum, and Average for all dates after {start}."""
     sel = [measurement.date, func.avg(measurement.tobs), func.max(measurement.tobs),\
             func.min(measurement.tobs)]
+
     # Perform query with no end date
     if not end: 
+
         # Convert start date to datetime
         start = dt.datetime.strptime(start, "%Y-%m-%d")
 
@@ -172,13 +179,13 @@ def stats(start=None, end=None):
 
         # Convert into list of dictionaries
         from_start = [
-        {
-        "Date": date, "Temperature":
-        {"Average": round(avg_temp, 2),
-        "Maximum": max_temp,
-        "Minimum": min_temp
-         }}
-        for date, avg_temp, max_temp, min_temp in results]
+            {
+            "Date": date, "Temperature":
+            {"Average": round(avg_temp, 2),
+            "Maximum": max_temp,
+            "Minimum": min_temp
+            }}
+            for date, avg_temp, max_temp, min_temp in results]
 
         # Return the JSON representation of the list
         return jsonify(from_start)
@@ -205,6 +212,72 @@ def stats(start=None, end=None):
         for date, avg_temp, max_temp, min_temp in results]
 
     # Return the JSON representation of the list
+    return jsonify(start_to_end)
+
+# Create start end aggregate route
+@app.route('/api/v1.0/aggregate/<start>/')
+@app.route('/api/v1.0/aggregate/<start>/<end>')
+
+# Define aggregate function for start and end dates
+def aggregate(start, end=None):
+    # Create our session from Python to the DB
+    Session = sessionmaker(bind=engine)
+    session = Session()
+ 
+    """Return average, maximum, and minimum temperature"""
+    # Select statement
+    sel = [func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)]
+
+    # Perform query with no end date
+    if not end:
+        # Convert date to datetime
+        start = dt.datetime.strptime(start, "%Y-%m-%d")
+        
+        # Perform query
+        results = session.query(*sel).\
+            filter(measurement.date >= start).all()
+        
+        # Close the session
+        session.close()
+
+        # Unravel results into a 1D array and convert to a list
+        temps = list(np.ravel(results))
+
+        # Convert to dictionary to format
+        start = {"Start Date": start, "Temperature":
+        {"Average": round(temps[1], 2),
+        "Maximum": temps[2],
+        "Minimum" : temps[0]
+        }}
+
+        # Return Results
+        return jsonify(start)
+    
+    # Perform query with end date
+
+    """Return average, maximum, and minimum temperature for a range of dates"""
+    # Convert dates to datetime
+    start = dt.datetime.strptime(start, "%Y-%m-%d")
+    end = dt.datetime.strptime(end, "%Y-%m-%d")
+
+    # Preform query
+    results = session.query(*sel).\
+        filter(measurement.date >= start).\
+        filter(measurement.date <= end).all()
+        
+    session.close()
+
+    # Unravel results into a 1D array and convert to a list
+    temps = list(np.ravel(results))
+
+    # Convert to dictionary to format
+    start_to_end = {"Begin Date": start, "End Date": end, "Temperature":
+        {"Average": round(temps[1], 2),
+        "Maximum": temps[2],
+        "Minimum" : temps[0]
+        }}
+    
+    # Return results
     return jsonify(start_to_end)
 
 if __name__ == '__main__':
